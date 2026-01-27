@@ -123,7 +123,6 @@ function saveScannedPieces() {
 // Initialize puzzle
 function initializePuzzle() {
     const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
-    document.getElementById('total-pieces').textContent = totalPieces;
     
     // Create puzzle pieces structure
     for (let i = 0; i < totalPieces; i++) {
