@@ -52,8 +52,10 @@ def generate_qr_codes(output_dir='qr-codes', size=300, base_url=None):
             border=4,
         )
         
-        # Add data (URL with piece parameter)
-        url = f"{base_url}?piece={piece_id}"
+        # Add data (URL with piece parameter - explicit index.html for GitHub Pages)
+        # Remove trailing slash if present
+        base = base_url.rstrip('/')
+        url = f"{base}/index.html?piece={piece_id}"
         qr.add_data(url)
         qr.make(fit=True)
         

@@ -33,47 +33,47 @@
     
     <div class="test-url">
         <strong>Piece 0:</strong><br>
-        <a href="?piece=0" target="_blank">?piece=0</a>
+        <a href="index.html?piece=0" target="_blank">index.html?piece=0</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 1:</strong><br>
-        <a href="?piece=1" target="_blank">?piece=1</a>
+        <a href="index.html?piece=1" target="_blank">index.html?piece=1</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 2:</strong><br>
-        <a href="?piece=2" target="_blank">?piece=2</a>
+        <a href="index.html?piece=2" target="_blank">index.html?piece=2</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 3:</strong><br>
-        <a href="?piece=3" target="_blank">?piece=3</a>
+        <a href="index.html?piece=3" target="_blank">index.html?piece=3</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 4:</strong><br>
-        <a href="?piece=4" target="_blank">?piece=4</a>
+        <a href="index.html?piece=4" target="_blank">index.html?piece=4</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 5:</strong><br>
-        <a href="?piece=5" target="_blank">?piece=5</a>
+        <a href="index.html?piece=5" target="_blank">index.html?piece=5</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 6:</strong><br>
-        <a href="?piece=6" target="_blank">?piece=6</a>
+        <a href="index.html?piece=6" target="_blank">index.html?piece=6</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 7:</strong><br>
-        <a href="?piece=7" target="_blank">?piece=7</a>
+        <a href="index.html?piece=7" target="_blank">index.html?piece=7</a>
     </div>
     
     <div class="test-url">
         <strong>Piece 8:</strong><br>
-        <a href="?piece=8" target="_blank">?piece=8</a>
+        <a href="index.html?piece=8" target="_blank">index.html?piece=8</a>
     </div>
     
     <hr>
@@ -91,6 +91,12 @@
         console.log('Current URL:', window.location.href);
         console.log('Search params:', window.location.search);
         console.log('Piece ID:', pieceId);
+        
+        // Auto-redirect to index.html if piece parameter is present
+        if (pieceId !== null) {
+            console.log('Redirecting to index.html with piece parameter...');
+            window.location.href = 'index.html?piece=' + pieceId;
+        }
     </script>
 </body>
 </html>

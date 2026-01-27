@@ -21,16 +21,19 @@ let currentMessageIndex = 0;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    
     loadScannedPieces();
     initializePuzzle();
-    
-    // Check URL immediately and also after a small delay to catch any timing issues
-    checkURLForPiece();
-    setTimeout(() => {
-        checkURLForPiece();
-    }, 100);
-    
     updateProgress();
+    
+    // Check URL after everything is initialized
+    // Use a longer delay to ensure all DOM elements are ready
+    setTimeout(() => {
+        console.log('Checking URL for piece parameter...');
+        checkURLForPiece();
+    }, 200);
+    
     displayExistingPieces();
     startAnimationLoop();
     // Set initial message based on current progress
@@ -69,10 +72,19 @@ window.addEventListener('resize', () => {
 
 // Check URL for piece parameter
 function checkURLForPiece() {
+    // Check both search params and hash (some QR scanners use hash)
     const urlParams = new URLSearchParams(window.location.search);
-    const pieceId = urlParams.get('piece');
+    let pieceId = urlParams.get('piece');
     
+    // Also check hash if search params don't have it
+    if (!pieceId && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        pieceId = hashParams.get('piece');
+    }
+    
+    console.log('Full URL:', window.location.href);
     console.log('URL search params:', window.location.search);
+    console.log('URL hash:', window.location.hash);
     console.log('Piece ID from URL:', pieceId);
     
     if (pieceId !== null && pieceId !== '') {
@@ -80,17 +92,18 @@ function checkURLForPiece() {
         console.log('Parsed piece number:', pieceNum);
         
         if (!isNaN(pieceNum) && pieceNum >= 0 && pieceNum < 9) {
-            console.log('Unlocking piece:', pieceNum);
+            console.log('✅ Valid piece number, unlocking piece:', pieceNum);
             unlockPiece(pieceNum);
-            // Clean URL (remove parameter) after a short delay
+            // Clean URL (remove parameter) after unlocking
             setTimeout(() => {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }, 100);
+                const cleanUrl = window.location.pathname + (window.location.hash ? window.location.hash : '');
+                window.history.replaceState({}, document.title, cleanUrl);
+            }, 500);
         } else {
-            console.warn('Invalid piece number:', pieceNum);
+            console.warn('❌ Invalid piece number:', pieceNum);
         }
     } else {
-        console.log('No piece parameter in URL');
+        console.log('ℹ️ No piece parameter in URL');
     }
 }
 
@@ -273,11 +286,25 @@ function showUnlockMessage(pieceId) {
     const unlockMessage = document.getElementById('unlock-message');
     const unlockPreview = document.getElementById('unlock-preview');
     
+    if (!unlockMessage || !unlockPreview) {
+        console.error('Unlock message elements not found!');
+        // Fallback: just display the piece directly
+        displayPiece(pieceId, false);
+        return;
+    }
+    
     // Create image element
     const img = document.createElement('img');
     img.src = getPieceImagePath(pieceId);
     img.alt = `Piece ${pieceId}`;
     img.className = 'unlock-image';
+    
+    // Add error handler for image loading
+    img.onerror = function() {
+        console.error('Failed to load piece image:', this.src);
+        // Try alternative path
+        this.src = `./pieces/${pieceId}.jpeg`;
+    };
     
     unlockPreview.innerHTML = '';
     unlockPreview.appendChild(img);
@@ -318,8 +345,26 @@ function unblurBackgroundPieces() {
 
 // Display a puzzle piece
 function displayPiece(pieceId, skipAnimation = false) {
+    console.log('displayPiece called with:', pieceId);
+    
     const piece = puzzlePieces[pieceId];
-    if (!piece) return;
+    if (!piece) {
+        console.error('Piece not found in puzzlePieces array:', pieceId);
+        return;
+    }
+    
+    const piecesContainer = document.getElementById('pieces-container');
+    if (!piecesContainer) {
+        console.error('pieces-container element not found!');
+        return;
+    }
+    
+    // Check if piece already exists
+    const existingPiece = document.getElementById(`piece-${pieceId}`);
+    if (existingPiece) {
+        console.log('Piece already displayed:', pieceId);
+        return;
+    }
     
     // Create piece element
     const pieceElement = document.createElement('div');
@@ -328,11 +373,29 @@ function displayPiece(pieceId, skipAnimation = false) {
     
     // Create image
     const img = document.createElement('img');
-    img.src = getPieceImagePath(pieceId);
+    const imagePath = getPieceImagePath(pieceId);
+    img.src = imagePath;
     img.alt = `Puzzle piece ${pieceId}`;
+    
+    // Add error handler
+    img.onerror = function() {
+        console.error('Failed to load piece image:', this.src);
+        // Try alternative paths
+        this.src = `./pieces/${pieceId}.jpeg`;
+        this.onerror = function() {
+            this.src = `/pieces/${pieceId}.jpeg`;
+            console.error('Failed to load with alternative paths');
+        };
+    };
+    
+    img.onload = function() {
+        console.log('Piece image loaded successfully:', imagePath);
+    };
+    
     pieceElement.appendChild(img);
     
-    document.getElementById('pieces-container').appendChild(pieceElement);
+    piecesContainer.appendChild(pieceElement);
+    console.log('Piece element added to container:', pieceId);
     
     // Blur background pieces when showing new piece
     if (!skipAnimation) {
@@ -464,7 +527,11 @@ function changePieceDirection(piece) {
 
 // Get the image path for a specific piece
 function getPieceImagePath(pieceId) {
-    return `pieces/${pieceId}.jpeg`;
+    // Try relative path first, fallback to absolute if needed
+    // For GitHub Pages, relative paths should work from root
+    const path = `pieces/${pieceId}.jpeg`;
+    console.log('Getting image path for piece', pieceId, ':', path);
+    return path;
 }
 
 // Trigger enhanced confetti animation
