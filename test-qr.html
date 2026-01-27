@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR Code URLs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-url {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test QR Code URLs</h1>
+    <p>Click these links to test if the piece unlocking works:</p>
+    
+    <div class="test-url">
+        <strong>Piece 0:</strong><br>
+        <a href="?piece=0" target="_blank">?piece=0</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 1:</strong><br>
+        <a href="?piece=1" target="_blank">?piece=1</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 2:</strong><br>
+        <a href="?piece=2" target="_blank">?piece=2</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 3:</strong><br>
+        <a href="?piece=3" target="_blank">?piece=3</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 4:</strong><br>
+        <a href="?piece=4" target="_blank">?piece=4</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 5:</strong><br>
+        <a href="?piece=5" target="_blank">?piece=5</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 6:</strong><br>
+        <a href="?piece=6" target="_blank">?piece=6</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 7:</strong><br>
+        <a href="?piece=7" target="_blank">?piece=7</a>
+    </div>
+    
+    <div class="test-url">
+        <strong>Piece 8:</strong><br>
+        <a href="?piece=8" target="_blank">?piece=8</a>
+    </div>
+    
+    <hr>
+    <h2>Current URL Parameters:</h2>
+    <p id="current-url"></p>
+    <p id="parsed-piece"></p>
+    
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const pieceId = urlParams.get('piece');
+        
+        document.getElementById('current-url').textContent = 'Full URL: ' + window.location.href;
+        document.getElementById('parsed-piece').textContent = 'Piece ID from URL: ' + (pieceId || 'None');
+        
+        console.log('Current URL:', window.location.href);
+        console.log('Search params:', window.location.search);
+        console.log('Piece ID:', pieceId);
+    </script>
+</body>
+</html>

@@ -23,7 +23,13 @@ let currentMessageIndex = 0;
 document.addEventListener('DOMContentLoaded', () => {
     loadScannedPieces();
     initializePuzzle();
+    
+    // Check URL immediately and also after a small delay to catch any timing issues
     checkURLForPiece();
+    setTimeout(() => {
+        checkURLForPiece();
+    }, 100);
+    
     updateProgress();
     displayExistingPieces();
     startAnimationLoop();
@@ -66,13 +72,25 @@ function checkURLForPiece() {
     const urlParams = new URLSearchParams(window.location.search);
     const pieceId = urlParams.get('piece');
     
-    if (pieceId !== null) {
+    console.log('URL search params:', window.location.search);
+    console.log('Piece ID from URL:', pieceId);
+    
+    if (pieceId !== null && pieceId !== '') {
         const pieceNum = parseInt(pieceId);
+        console.log('Parsed piece number:', pieceNum);
+        
         if (!isNaN(pieceNum) && pieceNum >= 0 && pieceNum < 9) {
+            console.log('Unlocking piece:', pieceNum);
             unlockPiece(pieceNum);
-            // Clean URL (remove parameter)
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clean URL (remove parameter) after a short delay
+            setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 100);
+        } else {
+            console.warn('Invalid piece number:', pieceNum);
         }
+    } else {
+        console.log('No piece parameter in URL');
     }
 }
 
@@ -205,10 +223,15 @@ function startAnimationLoop() {
 
 // Unlock a piece
 function unlockPiece(pieceId) {
+    console.log('unlockPiece called with:', pieceId, 'Type:', typeof pieceId);
+    
     if (scannedPieces.has(pieceId.toString())) {
         // Piece already unlocked
+        console.log('Piece already unlocked:', pieceId);
         return;
     }
+    
+    console.log('Unlocking new piece:', pieceId);
     
     // Add to scanned pieces
     scannedPieces.add(pieceId.toString());
