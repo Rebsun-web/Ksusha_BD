@@ -406,11 +406,12 @@ function showUnlockMessage(pieceId) {
     // Add error handler for image loading
     img.onerror = function() {
         console.error('Failed to load piece image:', this.src);
-        // Try alternative paths
+        // Try alternative extension (pieces 0-5 are .jpg, 6-8 are .jpeg)
+        const altExtension = pieceId <= 5 ? 'jpeg' : 'jpg';
         const altPaths = [
-            `./pieces/${pieceId}.jpeg`,
-            `/pieces/${pieceId}.jpeg`,
-            `pieces/${pieceId}.jpeg`
+            `pieces/${pieceId}.${altExtension}`,
+            `./pieces/${pieceId}.${altExtension}`,
+            `/pieces/${pieceId}.${altExtension}`
         ];
         let currentPathIndex = 0;
         this.onerror = function() {
@@ -509,11 +510,19 @@ function displayPiece(pieceId, skipAnimation = false) {
     // Add error handler
     img.onerror = function() {
         console.error('Failed to load piece image:', this.src);
-        // Try alternative paths
-        this.src = `./pieces/${pieceId}.jpeg`;
+        // Try alternative extension (pieces 0-5 are .jpg, 6-8 are .jpeg)
+        const altExtension = pieceId <= 5 ? 'jpeg' : 'jpg';
+        this.src = `pieces/${pieceId}.${altExtension}`;
         this.onerror = function() {
-            this.src = `/pieces/${pieceId}.jpeg`;
-            console.error('Failed to load with alternative paths');
+            // Try with relative path prefix
+            this.src = `./pieces/${pieceId}.${altExtension}`;
+            this.onerror = function() {
+                // Try absolute path
+                this.src = `/pieces/${pieceId}.${altExtension}`;
+                this.onerror = function() {
+                    console.error('Failed to load with all alternative paths');
+                };
+            };
         };
     };
     
@@ -717,7 +726,13 @@ function openPieceViewer(pieceId) {
     // Add error handler
     img.onerror = function() {
         console.error('Failed to load piece image for viewer:', this.src);
-        this.src = `./pieces/${pieceId}.jpeg`;
+        // Try alternative extension (pieces 0-5 are .jpg, 6-8 are .jpeg)
+        const altExtension = pieceId <= 5 ? 'jpeg' : 'jpg';
+        this.src = `./pieces/${pieceId}.${altExtension}`;
+        this.onerror = function() {
+            this.src = `pieces/${pieceId}.${altExtension}`;
+            console.error('Failed to load with alternative extension');
+        };
     };
     
     imageContainer.innerHTML = '';
@@ -739,9 +754,9 @@ function closePieceViewer() {
 
 // Get the image path for a specific piece
 function getPieceImagePath(pieceId) {
-    // Try relative path first, fallback to absolute if needed
-    // For GitHub Pages, relative paths should work from root
-    const path = `pieces/${pieceId}.jpeg`;
+    // Pieces 0-5 use .jpg, pieces 6-8 use .jpeg
+    const extension = pieceId <= 5 ? 'jpg' : 'jpeg';
+    const path = `pieces/${pieceId}.${extension}`;
     console.log('Getting image path for piece', pieceId, ':', path);
     return path;
 }
