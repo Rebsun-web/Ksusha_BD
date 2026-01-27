@@ -105,23 +105,32 @@ function checkURLForPiece() {
             // Unlock the piece (will sync across tabs via localStorage)
             unlockPiece(pieceNum);
             
-            // If this looks like a new tab from QR scan, redirect to main page after a delay
-            // This keeps all pieces visible in one tab
-            const isLikelyQRScan = window.history.length <= 2 && document.referrer === '';
-            
-            if (isLikelyQRScan) {
-                // Show unlock message, then redirect to main page
-                setTimeout(() => {
-                    // Redirect to main page (without piece parameter)
-                    window.location.href = window.location.pathname;
-                }, 3000); // Wait 3 seconds to show the unlock animation
-            } else {
-                // Normal navigation - just clean URL
-                setTimeout(() => {
-                    const cleanUrl = window.location.pathname + (window.location.hash ? window.location.hash : '');
-                    window.history.replaceState({}, document.title, cleanUrl);
-                }, 500);
-            }
+            // Check if this is the last piece AFTER unlocking
+            // Use a small delay to ensure scannedPieces is updated
+            setTimeout(() => {
+                const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
+                const isLastPiece = scannedPieces.size >= totalPieces;
+                
+                // If this looks like a new tab from QR scan, redirect to main page after a delay
+                // This keeps all pieces visible in one tab
+                // BUT: Don't redirect if this is the last piece - let showCompletePuzzle handle it
+                const isLikelyQRScan = window.history.length <= 2 && document.referrer === '';
+                
+                if (isLikelyQRScan && !isLastPiece) {
+                    // Show unlock message, then redirect to main page
+                    setTimeout(() => {
+                        // Redirect to main page (without piece parameter)
+                        window.location.href = window.location.pathname;
+                    }, 3000); // Wait 3 seconds to show the unlock animation
+                } else if (!isLastPiece) {
+                    // Normal navigation - just clean URL
+                    setTimeout(() => {
+                        const cleanUrl = window.location.pathname + (window.location.hash ? window.location.hash : '');
+                        window.history.replaceState({}, document.title, cleanUrl);
+                    }, 500);
+                }
+                // If it's the last piece, don't redirect - showCompletePuzzle will handle the display
+            }, 100); // Small delay to ensure scannedPieces is updated
         } else {
             console.warn('❌ Invalid piece number:', pieceNum);
         }
@@ -902,10 +911,14 @@ function showCompletePuzzle() {
         // Wait a bit more, then fade pieces and show complete image
         setTimeout(() => {
             console.log('Showing complete puzzle container');
+            console.log('Image path:', CONFIG.mainImagePath);
             container.style.display = 'flex';
             
             // Create complete image
             const img = document.createElement('img');
+            img.style.display = 'block';
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
             img.src = CONFIG.mainImagePath;
             img.alt = 'Complete Puzzle';
             
@@ -916,9 +929,11 @@ function showCompletePuzzle() {
                 const altPaths = [
                     `./${CONFIG.mainImagePath}`,
                     `/${CONFIG.mainImagePath}`,
+                    `../${CONFIG.mainImagePath}`,
                     CONFIG.mainImagePath
                 ];
                 let currentPathIndex = 0;
+                const originalOnError = this.onerror;
                 this.onerror = function() {
                     currentPathIndex++;
                     if (currentPathIndex < altPaths.length) {
@@ -926,18 +941,22 @@ function showCompletePuzzle() {
                         this.src = altPaths[currentPathIndex];
                     } else {
                         console.error('All image paths failed for complete puzzle');
-                        container.innerHTML = '<p style="color: white; font-size: 24px;">Puzzle Complete! 🎉</p>';
+                        container.innerHTML = '<p style="color: white; font-size: 24px; text-align: center;">Puzzle Complete! 🎉<br><small>Image not found: ' + CONFIG.mainImagePath + '</small></p>';
                     }
                 };
                 this.src = altPaths[0];
             };
             
             img.onload = function() {
-                console.log('Complete puzzle image loaded successfully:', CONFIG.mainImagePath);
+                console.log('✅ Complete puzzle image loaded successfully:', this.src);
+                console.log('Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
             };
             
             container.innerHTML = '';
             container.appendChild(img);
+            
+            // Force a reflow to ensure display
+            container.offsetHeight;
             
             // Fade out the individual pieces
             floatingPieces.forEach(p => {
@@ -1024,3 +1043,14 @@ function updateProgress() {
         progressTitle.textContent = '🎁 Подарок готов!';
     }
 }
+
+// Reset function - clears all scanned pieces and reloads the page
+// Call this from browser console: resetPuzzle()
+function resetPuzzle() {
+    localStorage.removeItem('scannedPieces');
+    localStorage.removeItem('scannedPiecesUpdate');
+    location.reload();
+}
+
+// Make resetPuzzle available globally for console access
+window.resetPuzzle = resetPuzzle;
