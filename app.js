@@ -353,7 +353,11 @@ function unlockPiece(pieceId) {
     showUnlockMessage(pieceId);
     
     // Check if puzzle is complete
-    if (scannedPieces.size === CONFIG.gridSize * CONFIG.gridSize) {
+    const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
+    console.log('Scanned pieces:', scannedPieces.size, 'Total needed:', totalPieces);
+    
+    if (scannedPieces.size === totalPieces) {
+        console.log('🎉 All pieces collected! Showing complete puzzle...');
         setTimeout(() => {
             showCompletePuzzle();
         }, CONFIG.pieceDisplayTime + 2000);
@@ -809,8 +813,14 @@ function triggerConfetti() {
 
 // Show complete puzzle
 function showCompletePuzzle() {
+    console.log('showCompletePuzzle called');
     const container = document.getElementById('complete-puzzle');
-    container.style.display = 'flex';
+    const piecesContainer = document.getElementById('pieces-container');
+    
+    if (!container) {
+        console.error('complete-puzzle container not found!');
+        return;
+    }
     
     // Stop physics animation
     if (physicsAnimationId !== null) {
@@ -818,32 +828,119 @@ function showCompletePuzzle() {
         physicsAnimationId = null;
     }
     
-    // Animate floating pieces to center
+    // Calculate center position and piece size for the final puzzle
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const puzzleSize = Math.min(viewportWidth * 0.85, viewportHeight * 0.7);
+    const pieceSize = puzzleSize / CONFIG.gridSize;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
+    
+    console.log('Animating pieces to form puzzle. Puzzle size:', puzzleSize, 'Piece size:', pieceSize);
+    
+    // Animate floating pieces to their correct positions in the puzzle
     floatingPieces.forEach(p => {
         if (p.element) {
-            p.element.style.transition = 'all 2s ease-out';
-            p.element.style.transform = `translate(${(p.col - CONFIG.gridSize/2 + 0.5) * 150}px, ${(p.row - CONFIG.gridSize/2 + 0.5) * 150}px) scale(0.3)`;
-            p.element.style.opacity = '0';
+            // Calculate target position for this piece in the grid
+            // For 3x3 grid: col 0,1,2 -> offset -1,0,1
+            const offsetX = (p.col - (CONFIG.gridSize - 1) / 2) * pieceSize;
+            const targetX = centerX + offsetX;
+            const offsetY = (p.row - (CONFIG.gridSize - 1) / 2) * pieceSize;
+            const targetY = centerY + offsetY;
+            
+            // Get current position relative to viewport
+            const currentRect = p.element.getBoundingClientRect();
+            const currentX = currentRect.left + currentRect.width / 2;
+            const currentY = currentRect.top + currentRect.height / 2;
+            
+            console.log(`Piece ${p.id} (row ${p.row}, col ${p.col}): moving from (${currentX}, ${currentY}) to (${targetX}, ${targetY})`);
+            
+            // Remove floating class and set up for animation
+            p.element.classList.remove('floating');
+            p.element.style.position = 'fixed';
+            p.element.style.left = currentX + 'px';
+            p.element.style.top = currentY + 'px';
+            p.element.style.width = pieceSize + 'px';
+            p.element.style.height = pieceSize + 'px';
+            p.element.style.marginLeft = '-' + (pieceSize / 2) + 'px';
+            p.element.style.marginTop = '-' + (pieceSize / 2) + 'px';
+            p.element.style.zIndex = '9999';
+            p.element.style.transition = 'all 2.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            p.element.style.transform = 'rotate(0deg)';
+            
+            // Animate to target position
+            requestAnimationFrame(() => {
+                p.element.style.left = targetX + 'px';
+                p.element.style.top = targetY + 'px';
+                p.element.style.transform = 'rotate(0deg)';
+            });
         }
     });
     
+    // After pieces are in position, show the complete puzzle overlay
     setTimeout(() => {
-        // Create complete image
-        const img = document.createElement('img');
-        img.src = CONFIG.mainImagePath;
-        img.alt = 'Complete Puzzle';
-        container.innerHTML = '';
-        container.appendChild(img);
+        console.log('Pieces should be in position now');
         
-        // Clear pieces container
-        document.getElementById('pieces-container').innerHTML = '';
-        
-        // Clear floating pieces array
-        floatingPieces = [];
-        
-        // Show success message
+        // Show success message first
         showSuccessMessage();
-    }, 2000);
+        
+        // Wait a bit more, then fade pieces and show complete image
+        setTimeout(() => {
+            console.log('Showing complete puzzle container');
+            container.style.display = 'flex';
+            
+            // Create complete image
+            const img = document.createElement('img');
+            img.src = CONFIG.mainImagePath;
+            img.alt = 'Complete Puzzle';
+            
+            // Add error handler
+            img.onerror = function() {
+                console.error('Failed to load complete puzzle image:', this.src);
+                // Try alternative paths
+                const altPaths = [
+                    `./${CONFIG.mainImagePath}`,
+                    `/${CONFIG.mainImagePath}`,
+                    CONFIG.mainImagePath
+                ];
+                let currentPathIndex = 0;
+                this.onerror = function() {
+                    currentPathIndex++;
+                    if (currentPathIndex < altPaths.length) {
+                        console.log('Trying alternative path:', altPaths[currentPathIndex]);
+                        this.src = altPaths[currentPathIndex];
+                    } else {
+                        console.error('All image paths failed for complete puzzle');
+                        container.innerHTML = '<p style="color: white; font-size: 24px;">Puzzle Complete! 🎉</p>';
+                    }
+                };
+                this.src = altPaths[0];
+            };
+            
+            img.onload = function() {
+                console.log('Complete puzzle image loaded successfully:', CONFIG.mainImagePath);
+            };
+            
+            container.innerHTML = '';
+            container.appendChild(img);
+            
+            // Fade out the individual pieces
+            floatingPieces.forEach(p => {
+                if (p.element) {
+                    p.element.style.transition = 'opacity 1.5s ease-out';
+                    p.element.style.opacity = '0';
+                }
+            });
+            
+            // Clear pieces container after fade
+            setTimeout(() => {
+                if (piecesContainer) {
+                    piecesContainer.innerHTML = '';
+                }
+                floatingPieces = [];
+            }, 1500);
+        }, 2000); // Wait 2 seconds after pieces are in position
+    }, 2500); // Wait for pieces to animate into position (2.5s animation + buffer)
 }
 
 // Show success message
