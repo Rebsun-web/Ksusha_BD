@@ -97,12 +97,31 @@ function checkURLForPiece() {
         
         if (!isNaN(pieceNum) && pieceNum >= 0 && pieceNum < 9) {
             console.log('✅ Valid piece number, unlocking piece:', pieceNum);
+            
+            // Check if we're in a new tab/window
+            const isNewTab = window.opener !== null || 
+                            (window.history.length === 1 && document.referrer === '');
+            
+            // Unlock the piece (will sync across tabs via localStorage)
             unlockPiece(pieceNum);
-            // Clean URL (remove parameter) after unlocking
-            setTimeout(() => {
-                const cleanUrl = window.location.pathname + (window.location.hash ? window.location.hash : '');
-                window.history.replaceState({}, document.title, cleanUrl);
-            }, 500);
+            
+            // If this looks like a new tab from QR scan, redirect to main page after a delay
+            // This keeps all pieces visible in one tab
+            const isLikelyQRScan = window.history.length <= 2 && document.referrer === '';
+            
+            if (isLikelyQRScan) {
+                // Show unlock message, then redirect to main page
+                setTimeout(() => {
+                    // Redirect to main page (without piece parameter)
+                    window.location.href = window.location.pathname;
+                }, 3000); // Wait 3 seconds to show the unlock animation
+            } else {
+                // Normal navigation - just clean URL
+                setTimeout(() => {
+                    const cleanUrl = window.location.pathname + (window.location.hash ? window.location.hash : '');
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }, 500);
+            }
         } else {
             console.warn('❌ Invalid piece number:', pieceNum);
         }
@@ -122,7 +141,36 @@ function loadScannedPieces() {
 // Save scanned pieces to localStorage
 function saveScannedPieces() {
     localStorage.setItem('scannedPieces', JSON.stringify([...scannedPieces]));
+    // Trigger storage event for cross-tab synchronization
+    localStorage.setItem('scannedPiecesUpdate', Date.now().toString());
+    // Also dispatch custom event for same-tab listeners
+    window.dispatchEvent(new Event('scannedPiecesUpdated'));
 }
+
+// Listen for storage changes (cross-tab synchronization)
+window.addEventListener('storage', (e) => {
+    if (e.key === 'scannedPieces') {
+        const saved = e.newValue;
+        if (saved) {
+            scannedPieces = new Set(JSON.parse(saved));
+            updateProgress();
+            displayExistingPieces();
+            updateInstructionMessage();
+        }
+    } else if (e.key === 'scannedPiecesUpdate') {
+        // Reload scanned pieces when another tab updates them
+        loadScannedPieces();
+        updateProgress();
+        displayExistingPieces();
+    }
+});
+
+// Also listen for same-tab updates (using custom event)
+window.addEventListener('scannedPiecesUpdated', () => {
+    loadScannedPieces();
+    updateProgress();
+    displayExistingPieces();
+});
 
 // Initialize puzzle
 function initializePuzzle() {
