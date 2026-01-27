@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>QR Puzzle Reveal</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Unlock Message (shown when piece is unlocked) -->
+        <div id="unlock-message" class="unlock-message" style="display: none;">
+            <div class="unlock-content">
+                <h2>🎉 You unlocked a new picture! 🎉</h2>
+                <div id="unlock-preview"></div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div id="main-content">
+            <h1> Собери все картинки!</h1>
+            
+            <div id="puzzle-container">
+                <div id="pieces-container"></div>
+                <div id="complete-puzzle" style="display: none;"></div>
+            </div>
+            
+            <div id="progress">
+                <h2 id="progress-title">9 шагов на пути к подарку</h2>
+                <div id="progress-track">
+                    <div id="progress-bar"></div>
+                    <div id="progress-slider">
+                        <img src="Polzunok.png" alt="Progress slider" id="slider-image">
+                    </div>
+                </div>
+                <p id="progress-message" class="progress-message">Осталось 9 сюрпризов 💫</p>
+            </div>
+            
+            <div id="instructions">
+                <p id="instruction-message">Готова к следующему сюрпризу? 📸✨</p>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="confetti-canvas"></canvas>
+    
+    <script src="app.js"></script>
+</body>
+</html>

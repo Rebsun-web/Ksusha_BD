@@ -1,0 +1,16 @@
+# Python
+python-packages/
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Optional - uncomment if you don't want to commit these
+# generate_qr_codes.py
+# SPLITTING_INSTRUCTIONS.md
