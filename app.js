@@ -18,6 +18,8 @@ let puzzlePieces = [];
 let floatingPieces = [];
 let physicsAnimationId = null;
 let currentMessageIndex = 0;
+let touchPosition = { x: -1, y: -1 }; // Track touch/mouse position
+let isTouching = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,6 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     displayExistingPieces();
     startAnimationLoop();
+    setupTouchInteraction();
+    setupPieceViewer();
     // Set initial message based on current progress
     if (scannedPieces.size > 0) {
         currentMessageIndex = scannedPieces.size % MOTIVATIONAL_MESSAGES.length;
@@ -201,6 +205,50 @@ function startAnimationLoop() {
             const width = 200; // Fixed size
             const height = 200;
             
+            // Check collision with touch/mouse position
+            if (isTouching && touchPosition.x >= 0 && touchPosition.y >= 0) {
+                const pieceRect = {
+                    left: piece.x,
+                    top: piece.y,
+                    right: piece.x + width,
+                    bottom: piece.y + height,
+                    centerX: piece.x + width / 2,
+                    centerY: piece.y + height / 2
+                };
+                
+                // Check if touch is within piece bounds (with some padding)
+                const touchPadding = 50;
+                const touchX = touchPosition.x;
+                const touchY = touchPosition.y;
+                
+                if (touchX >= pieceRect.left - touchPadding &&
+                    touchX <= pieceRect.right + touchPadding &&
+                    touchY >= pieceRect.top - touchPadding &&
+                    touchY <= pieceRect.bottom + touchPadding) {
+                    
+                    // Calculate distance and direction from touch to piece center
+                    const dx = pieceRect.centerX - touchX;
+                    const dy = pieceRect.centerY - touchY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 0 && distance < width + touchPadding) {
+                        // Push piece away from touch position with stronger force
+                        const pushForce = 10;
+                        const angle = Math.atan2(dy, dx);
+                        piece.vx = Math.cos(angle) * pushForce;
+                        piece.vy = Math.sin(angle) * pushForce;
+                        
+                        // Add visual feedback
+                        piece.element.style.transition = 'filter 0.2s ease-out';
+                        piece.element.style.filter = 'brightness(1.2)';
+                        setTimeout(() => {
+                            piece.element.style.filter = '';
+                            piece.element.style.transition = '';
+                        }, 200);
+                    }
+                }
+            }
+            
             // Bounce off left and right edges of container
             if (piece.x <= containerLeft) {
                 piece.x = containerLeft;
@@ -294,15 +342,44 @@ function showUnlockMessage(pieceId) {
     
     // Create image element
     const img = document.createElement('img');
-    img.src = getPieceImagePath(pieceId);
+    const imagePath = getPieceImagePath(pieceId);
+    img.src = imagePath;
     img.alt = `Piece ${pieceId}`;
     img.className = 'unlock-image';
+    
+    // Ensure image is visible
+    img.style.display = 'block';
+    img.style.opacity = '0'; // Start invisible, animation will make it visible
     
     // Add error handler for image loading
     img.onerror = function() {
         console.error('Failed to load piece image:', this.src);
-        // Try alternative path
-        this.src = `./pieces/${pieceId}.jpeg`;
+        // Try alternative paths
+        const altPaths = [
+            `./pieces/${pieceId}.jpeg`,
+            `/pieces/${pieceId}.jpeg`,
+            `pieces/${pieceId}.jpeg`
+        ];
+        let currentPathIndex = 0;
+        this.onerror = function() {
+            currentPathIndex++;
+            if (currentPathIndex < altPaths.length) {
+                console.log('Trying alternative path:', altPaths[currentPathIndex]);
+                this.src = altPaths[currentPathIndex];
+            } else {
+                console.error('All image paths failed');
+                this.style.display = 'none';
+            }
+        };
+        this.src = altPaths[0];
+    };
+    
+    // Add load handler to ensure visibility
+    img.onload = function() {
+        console.log('Unlock image loaded successfully:', imagePath);
+        // Force visibility
+        this.style.opacity = '1';
+        this.style.display = 'block';
     };
     
     unlockPreview.innerHTML = '';
@@ -314,10 +391,11 @@ function showUnlockMessage(pieceId) {
     // Enhanced confetti with more particles
     triggerConfetti();
     
-    // Add zoom-in animation to the image
+    // Ensure image becomes visible after a short delay
     setTimeout(() => {
-        img.style.animation = 'zoomInUnlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-    }, 100);
+        img.style.opacity = '1';
+        img.style.visibility = 'visible';
+    }, 50);
     
     // Hide message and show piece after 2.5 seconds (slightly longer for better feel)
     setTimeout(() => {
@@ -469,9 +547,10 @@ function displayPiece(pieceId, skipAnimation = false) {
         
         floatingPieces.push(pieceData);
         
-        // Add click handler to change direction
-        pieceElement.addEventListener('click', () => {
-            changePieceDirection(pieceData);
+        // Add click handler to open piece in viewer
+        pieceElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPieceViewer(pieceId);
         });
         
         // Make piece cursor pointer to indicate it's clickable
@@ -484,44 +563,126 @@ function displayPiece(pieceId, skipAnimation = false) {
     }, skipAnimation ? 0 : CONFIG.pieceDisplayTime);
 }
 
-// Change piece direction when clicked (kick effect)
-function changePieceDirection(piece) {
-    if (!piece || !piece.element) return;
+// Setup touch/mouse interaction for bouncing pieces
+function setupTouchInteraction() {
+    const container = document.getElementById('puzzle-container');
+    if (!container) return;
     
-    // Generate new random direction
-    const angle = Math.random() * Math.PI * 2;
+    // Touch events
+    container.addEventListener('touchstart', (e) => {
+        isTouching = true;
+        const touch = e.touches[0];
+        const rect = container.getBoundingClientRect();
+        touchPosition.x = touch.clientX - rect.left;
+        touchPosition.y = touch.clientY - rect.top;
+    });
     
-    // Strong initial kick - fast start (but keep normal floating speed after)
-    const kickSpeed = 6 + Math.random() * 3; // Fast initial speed (6-9 pixels per frame)
+    container.addEventListener('touchmove', (e) => {
+        e.preventDefault(); // Prevent scrolling
+        const touch = e.touches[0];
+        const rect = container.getBoundingClientRect();
+        touchPosition.x = touch.clientX - rect.left;
+        touchPosition.y = touch.clientY - rect.top;
+    });
     
-    // Update velocity with strong kick
-    piece.vx = Math.cos(angle) * kickSpeed;
-    piece.vy = Math.sin(angle) * kickSpeed;
+    container.addEventListener('touchend', () => {
+        isTouching = false;
+        touchPosition.x = -1;
+        touchPosition.y = -1;
+    });
     
-    // Set friction to gradually slow down to normal floating speed
-    piece.friction = 0.98;
+    // Mouse events (for desktop)
+    container.addEventListener('mousedown', (e) => {
+        isTouching = true;
+        const rect = container.getBoundingClientRect();
+        touchPosition.x = e.clientX - rect.left;
+        touchPosition.y = e.clientY - rect.top;
+    });
     
-    // Store the kick time for reference
-    piece.kickTime = Date.now();
+    container.addEventListener('mousemove', (e) => {
+        if (isTouching) {
+            const rect = container.getBoundingClientRect();
+            touchPosition.x = e.clientX - rect.left;
+            touchPosition.y = e.clientY - rect.top;
+        }
+    });
     
-    // Visual feedback - bounce and flash (no rotation change)
-    const currentRotation = piece.rotation || 0;
+    container.addEventListener('mouseup', () => {
+        isTouching = false;
+        touchPosition.x = -1;
+        touchPosition.y = -1;
+    });
     
-    // Add bounce and flash effect
-    piece.element.style.transition = 'transform 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55), filter 0.2s ease-out';
-    piece.element.style.transform = `rotate(${currentRotation}deg) scale(1.3)`;
-    piece.element.style.filter = 'brightness(1.5) saturate(1.4)';
-    piece.element.style.zIndex = '50';
+    container.addEventListener('mouseleave', () => {
+        isTouching = false;
+        touchPosition.x = -1;
+        touchPosition.y = -1;
+    });
+}
+
+// Setup piece viewer modal
+function setupPieceViewer() {
+    const closeButton = document.getElementById('close-viewer');
+    const viewer = document.getElementById('piece-viewer');
     
-    // DO NOT change rotation - keep it as is
+    if (closeButton) {
+        closeButton.addEventListener('click', closePieceViewer);
+    }
     
-    setTimeout(() => {
-        piece.element.style.transition = 'none';
-        piece.element.style.filter = '';
-        piece.element.style.zIndex = '';
-        // Reset transform but keep rotation unchanged
-        piece.element.style.transform = `rotate(${currentRotation}deg)`;
-    }, 300);
+    if (viewer) {
+        // Close when clicking outside the image
+        viewer.addEventListener('click', (e) => {
+            if (e.target === viewer) {
+                closePieceViewer();
+            }
+        });
+        
+        // Close with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && viewer.style.display !== 'none') {
+                closePieceViewer();
+            }
+        });
+    }
+}
+
+// Open piece in viewer modal
+function openPieceViewer(pieceId) {
+    const viewer = document.getElementById('piece-viewer');
+    const imageContainer = document.getElementById('viewer-image-container');
+    
+    if (!viewer || !imageContainer) {
+        console.error('Piece viewer elements not found');
+        return;
+    }
+    
+    // Create image element
+    const img = document.createElement('img');
+    img.src = getPieceImagePath(pieceId);
+    img.alt = `Piece ${pieceId}`;
+    img.className = 'viewer-image';
+    
+    // Add error handler
+    img.onerror = function() {
+        console.error('Failed to load piece image for viewer:', this.src);
+        this.src = `./pieces/${pieceId}.jpeg`;
+    };
+    
+    imageContainer.innerHTML = '';
+    imageContainer.appendChild(img);
+    
+    // Show viewer
+    viewer.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // Prevent scrolling
+}
+
+// Close piece viewer modal
+function closePieceViewer() {
+    const viewer = document.getElementById('piece-viewer');
+    if (viewer) {
+        viewer.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scrolling
+    }
 }
 
 // Get the image path for a specific piece

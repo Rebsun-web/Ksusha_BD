@@ -113,7 +113,7 @@ h1 {
 }
 
 .puzzle-piece.full-size {
-    top: 50% !important;
+    top: 45% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) scale(1.2) !important;
     z-index: 100;
@@ -128,6 +128,7 @@ h1 {
                 0 0 120px rgba(255, 255, 255, 0.4);
     border: 5px solid rgba(255, 255, 255, 1);
     backdrop-filter: blur(0);
+    position: fixed !important;
 }
 
 @keyframes glowPulse {
@@ -350,6 +351,14 @@ h1 {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
+#unlock-preview {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+}
+
 .unlock-content h2 {
     color: #667eea;
     margin-bottom: 20px;
@@ -362,8 +371,9 @@ h1 {
     max-height: 50vh;
     border-radius: 15px;
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-    transform: scale(0.8);
-    opacity: 0;
+    display: block;
+    margin: 0 auto;
+    animation: zoomInUnlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 @keyframes zoomInUnlock {
@@ -373,6 +383,7 @@ h1 {
     }
     50% {
         transform: scale(1.1);
+        opacity: 1;
     }
     100% {
         transform: scale(1);
@@ -425,6 +436,8 @@ h1 {
     
     .puzzle-piece.full-size {
         width: 85vw !important;
+        top: 40% !important; /* Lower on mobile to avoid browser UI */
+        max-height: 60vh !important; /* Ensure it fits on screen */
     }
     
     .puzzle-piece.floating {
@@ -452,9 +465,96 @@ h1 {
     .puzzle-piece.full-size {
         width: 60vw !important;
         max-width: 300px !important;
+        top: 45% !important; /* Center vertically in landscape */
+        max-height: 70vh !important;
     }
     
     .unlock-image {
         max-height: 40vh;
+    }
+}
+
+/* Piece Viewer Modal */
+.piece-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.piece-viewer-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.close-button {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 36px;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 10001;
+    transition: transform 0.2s, background 0.2s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.close-button:hover {
+    background: white;
+    transform: scale(1.1);
+}
+
+.close-button:active {
+    transform: scale(0.95);
+}
+
+.viewer-image {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 15px;
+    box-shadow: 0 10px 50px rgba(255, 255, 255, 0.3);
+    animation: zoomIn 0.4s ease-out;
+}
+
+#viewer-image-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Mobile adjustments for viewer */
+@media (max-width: 768px) {
+    .close-button {
+        top: 10px;
+        right: 10px;
+        width: 45px;
+        height: 45px;
+        font-size: 32px;
+    }
+    
+    .viewer-image {
+        max-height: 85vh;
     }
 }
