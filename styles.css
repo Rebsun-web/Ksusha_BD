@@ -306,6 +306,44 @@ h1 {
     transition: opacity 0.3s ease-out;
 }
 
+/* Reset Button */
+.reset-button {
+    display: block;
+    margin: 20px auto;
+    padding: 12px 24px;
+    background: rgba(255, 100, 100, 0.9);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 25px;
+    font-size: clamp(14px, 3vw, 16px);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.reset-button:hover {
+    background: rgba(255, 80, 80, 1);
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.reset-button:active {
+    transform: scale(0.98);
+    background: rgba(255, 120, 120, 1);
+}
+
+@media (max-width: 768px) {
+    .reset-button {
+        padding: 14px 28px;
+        font-size: 16px;
+        margin: 25px auto;
+    }
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

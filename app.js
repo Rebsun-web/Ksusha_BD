@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     startAnimationLoop();
     setupTouchInteraction();
     setupPieceViewer();
+    setupResetButton();
     // Set initial message based on current progress
     if (scannedPieces.size > 0) {
         currentMessageIndex = scannedPieces.size % MOTIVATIONAL_MESSAGES.length;
@@ -1204,6 +1205,19 @@ function updateProgress() {
     // Update title if needed
     if (foundCount === totalPieces) {
         progressTitle.textContent = 'Пакуй трусишки в Порто!';
+    }
+}
+
+// Setup reset button
+function setupResetButton() {
+    const resetButton = document.getElementById('reset-button');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            // Confirm before resetting
+            if (confirm('Точно хочешь начать заново? Все найденные картинки будут удалены.')) {
+                resetPuzzle();
+            }
+        });
     }
 }
 
