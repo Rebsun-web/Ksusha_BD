@@ -10,6 +10,8 @@ const CONFIG = {
     audioExtension: 'mp3', // or 'wav', 'ogg', etc.
     // Option 2: Single audio file for all pieces (set audioPerPiece to false)
     // singleAudioPath: 'audio/unlock.mp3'
+    // Final song when puzzle is complete
+    finalSongPath: 'final_song.mp3'
 };
 
 // Motivational messages that rotate when new pieces are unlocked
@@ -549,6 +551,103 @@ function playUnlockAudio(pieceId) {
     
     // Let audio play to completion - don't stop it early
     // Audio will naturally stop when it finishes playing
+}
+
+// Play final song when puzzle is complete
+function playFinalSong() {
+    if (!CONFIG.finalSongPath) {
+        console.log('No final song configured');
+        return;
+    }
+    
+    console.log('Playing final song:', CONFIG.finalSongPath);
+    
+    // Create and play audio
+    const audio = new Audio(CONFIG.finalSongPath);
+    
+    // Preload the audio
+    audio.preload = 'auto';
+    
+    // Set volume (0.0 to 1.0) - slightly louder for celebration
+    audio.volume = 0.8;
+    
+    // Load the audio file
+    audio.load();
+    
+    // Add load event listener
+    audio.addEventListener('loadeddata', () => {
+        console.log('Final song loaded successfully:', CONFIG.finalSongPath);
+    });
+    
+    // Handle errors gracefully
+    audio.onerror = function() {
+        console.warn('Failed to load final song:', CONFIG.finalSongPath);
+        // Try alternative paths
+        const altPaths = [
+            `./${CONFIG.finalSongPath}`,
+            `/${CONFIG.finalSongPath}`,
+            `audio/${CONFIG.finalSongPath}`,
+            `./audio/${CONFIG.finalSongPath}`,
+            `/audio/${CONFIG.finalSongPath}`
+        ];
+        let currentPathIndex = 0;
+        this.onerror = function() {
+            currentPathIndex++;
+            if (currentPathIndex < altPaths.length) {
+                console.log('Trying alternative path for final song:', altPaths[currentPathIndex]);
+                this.src = altPaths[currentPathIndex];
+                this.load();
+            } else {
+                console.error('All paths failed for final song');
+            }
+        };
+        this.src = altPaths[0];
+        this.load();
+    };
+    
+    // Play audio with retry logic
+    const playAudio = (retryCount = 0) => {
+        const maxRetries = 5;
+        audio.play().then(() => {
+            console.log('Final song playing successfully');
+        }).catch(err => {
+            console.warn('Could not play final song (attempt', retryCount + 1, '):', err);
+            
+            // If audio context not unlocked, try to unlock it
+            if (!audioUnlocked) {
+                unlockAudioContext();
+            }
+            
+            // Retry with exponential backoff
+            if (retryCount < maxRetries) {
+                const delay = Math.min(100 * Math.pow(2, retryCount), 1000);
+                setTimeout(() => {
+                    playAudio(retryCount + 1);
+                }, delay);
+            } else {
+                // After max retries, wait for user interaction
+                const playOnInteraction = () => {
+                    unlockAudioContext();
+                    setTimeout(() => {
+                        audio.play().catch(e => console.warn('Final song failed after interaction:', e));
+                    }, 100);
+                    document.removeEventListener('touchstart', playOnInteraction);
+                    document.removeEventListener('click', playOnInteraction);
+                };
+                document.addEventListener('touchstart', playOnInteraction, { once: true });
+                document.addEventListener('click', playOnInteraction, { once: true });
+            }
+        });
+    };
+    
+    // Try to unlock audio context first
+    unlockAudioContext();
+    
+    // Try to play immediately
+    playAudio();
+    
+    // Store reference globally so it can be stopped if needed
+    window.finalSongAudio = audio;
 }
 
 // Show unlock message with the piece
@@ -1093,6 +1192,9 @@ function showCompletePuzzle() {
             console.log('Showing complete puzzle container');
             console.log('Image path:', CONFIG.mainImagePath);
             container.style.display = 'flex';
+            
+            // Play final song when complete puzzle is shown
+            playFinalSong();
             
             // Create complete image
             const img = document.createElement('img');
