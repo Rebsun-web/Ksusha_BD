@@ -503,7 +503,9 @@ function playUnlockAudio(pieceId) {
     const playAudio = (retryCount = 0) => {
         const maxRetries = 5;
         audio.play().then(() => {
-            console.log('Audio playing successfully');
+            console.log('✅ Audio playing successfully for piece', pieceId);
+            console.log('Audio duration:', audio.duration, 'seconds');
+            console.log('Audio currentTime:', audio.currentTime);
         }).catch(err => {
             console.warn('Could not play audio (attempt', retryCount + 1, '):', err);
             
@@ -523,7 +525,9 @@ function playUnlockAudio(pieceId) {
                 const playOnInteraction = () => {
                     unlockAudioContext();
                     setTimeout(() => {
-                        audio.play().catch(e => console.warn('Audio failed after interaction:', e));
+                        audio.play().then(() => {
+                            console.log('✅ Audio started after user interaction');
+                        }).catch(e => console.warn('Audio failed after interaction:', e));
                     }, 100);
                     document.removeEventListener('touchstart', playOnInteraction);
                     document.removeEventListener('click', playOnInteraction);
@@ -536,6 +540,23 @@ function playUnlockAudio(pieceId) {
     
     // Try to play immediately
     playAudio();
+    
+    // Add event listeners to track audio state
+    audio.addEventListener('play', () => {
+        console.log('▶️ Audio started playing for piece', pieceId);
+    });
+    
+    audio.addEventListener('pause', () => {
+        console.log('⏸️ Audio paused for piece', pieceId);
+    });
+    
+    audio.addEventListener('ended', () => {
+        console.log('⏹️ Audio ended for piece', pieceId, '- total duration was:', audio.duration);
+    });
+    
+    audio.addEventListener('error', (e) => {
+        console.error('❌ Audio error for piece', pieceId, ':', e);
+    });
     
     // Store reference to stop if needed
     if (!window.unlockAudios) {
@@ -747,34 +768,51 @@ function showUnlockMessage(pieceId) {
         displayPiece(pieceId, false, audio); // Pass audio to displayPiece
     };
     
-    // If we have audio, wait for it to finish before showing piece
+    // If we have audio, wait for it to finish before hiding message and showing piece
     if (audio) {
-        // Wait for audio metadata to load to get duration
+        // Wait for audio to finish playing
+        const onAudioEnd = () => {
+            console.log('Audio finished, hiding unlock message and showing piece');
+            showPiece();
+        };
+        
+        // Listen for audio end event
+        audio.addEventListener('ended', onAudioEnd, { once: true });
+        
+        // Also wait for audio metadata to load for fallback timing
         const onAudioReady = () => {
             const audioDuration = audio.duration || 0;
             console.log('Audio duration:', audioDuration, 'seconds');
             
-            // Hide message after 2.5 seconds, but keep piece visible until audio ends
-            setTimeout(() => {
-                unlockMessage.style.display = 'none';
-                displayPiece(pieceId, false, audio); // Pass audio to control when it floats
-            }, 2500);
+            // Fallback: if audio doesn't end (e.g., error), use duration + buffer
+            if (audioDuration > 0) {
+                const fallbackTime = (audioDuration * 1000) + 1000; // Add 1 second buffer
+                setTimeout(() => {
+                    // Check if audio is still playing or if we haven't shown piece yet
+                    if (!audio.ended && unlockMessage.style.display !== 'none') {
+                        console.warn('Audio did not fire ended event, using fallback timing');
+                        showPiece();
+                        audio.removeEventListener('ended', onAudioEnd);
+                    }
+                }, fallbackTime);
+            }
         };
         
         if (audio.readyState >= 2) { // HAVE_CURRENT_DATA or higher
             onAudioReady();
         } else {
             audio.addEventListener('loadedmetadata', onAudioReady, { once: true });
-            // Fallback: if metadata doesn't load, use minimum time
+            // Fallback: if metadata doesn't load, wait a bit then show piece
             setTimeout(() => {
-                if (audio.readyState < 2) {
+                if (audio.readyState < 2 && unlockMessage.style.display !== 'none') {
                     console.warn('Audio metadata not loaded, using fallback timing');
                     showPiece();
+                    audio.removeEventListener('ended', onAudioEnd);
                 }
-            }, 1000);
+            }, 3000); // Wait 3 seconds as fallback
         }
     } else {
-        // No audio, use default timing
+        // No audio, use default timing (show piece after 2.5 seconds)
         setTimeout(() => {
             unlockMessage.style.display = 'none';
             displayPiece(pieceId, false);
