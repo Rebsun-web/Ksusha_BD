@@ -433,10 +433,11 @@ function updateInstructionMessage() {
 }
 
 // Play audio when a piece is unlocked
+// Returns the audio object so we can track its duration
 function playUnlockAudio(pieceId) {
     // Check if audio is disabled
     if (!CONFIG.audioPerPiece && !CONFIG.singleAudioPath) {
-        return;
+        return null;
     }
     
     let audioPath;
@@ -448,7 +449,7 @@ function playUnlockAudio(pieceId) {
         // Use single audio file for all pieces
         audioPath = CONFIG.singleAudioPath;
     } else {
-        return;
+        return null;
     }
     
     console.log('Playing unlock audio for piece', pieceId, ':', audioPath);
@@ -460,7 +461,7 @@ function playUnlockAudio(pieceId) {
     audio.preload = 'auto';
     
     // Set volume (0.0 to 1.0)
-    audio.volume = 0.7;
+    audio.volume = 1;
     
     // Load the audio file
     audio.load();
@@ -468,6 +469,7 @@ function playUnlockAudio(pieceId) {
     // Add load event listener
     audio.addEventListener('loadeddata', () => {
         console.log('Audio loaded successfully:', audioPath);
+        console.log('Audio duration:', audio.duration, 'seconds');
     });
     
     // Handle errors gracefully
@@ -541,16 +543,17 @@ function playUnlockAudio(pieceId) {
     }
     window.unlockAudios.push(audio);
     
-    // Clean up after audio finishes (or after 5 seconds max)
+    // Clean up after audio finishes
     audio.addEventListener('ended', () => {
+        console.log('Audio finished playing for piece', pieceId);
         const index = window.unlockAudios.indexOf(audio);
         if (index > -1) {
             window.unlockAudios.splice(index, 1);
         }
     });
     
-    // Let audio play to completion - don't stop it early
-    // Audio will naturally stop when it finishes playing
+    // Return audio object so caller can track duration
+    return audio;
 }
 
 // Play final song when puzzle is complete
@@ -569,7 +572,7 @@ function playFinalSong() {
     audio.preload = 'auto';
     
     // Set volume (0.0 to 1.0) - slightly louder for celebration
-    audio.volume = 0.8;
+    audio.volume = 1;
     
     // Load the audio file
     audio.load();
@@ -729,8 +732,8 @@ function showUnlockMessage(pieceId) {
     // This helps with QR code scans
     unlockAudioContext();
     
-    // Play unlock audio (will retry if audio context not unlocked yet)
-    playUnlockAudio(pieceId);
+    // Play unlock audio and get audio object to track duration
+    const audio = playUnlockAudio(pieceId);
     
     // Ensure image becomes visible after a short delay
     setTimeout(() => {
@@ -738,11 +741,45 @@ function showUnlockMessage(pieceId) {
         img.style.visibility = 'visible';
     }, 50);
     
-    // Hide message and show piece after 2.5 seconds (slightly longer for better feel)
-    setTimeout(() => {
+    // Function to hide message and show piece
+    const showPiece = () => {
         unlockMessage.style.display = 'none';
-        displayPiece(pieceId, false);
-    }, 2500);
+        displayPiece(pieceId, false, audio); // Pass audio to displayPiece
+    };
+    
+    // If we have audio, wait for it to finish before showing piece
+    if (audio) {
+        // Wait for audio metadata to load to get duration
+        const onAudioReady = () => {
+            const audioDuration = audio.duration || 0;
+            console.log('Audio duration:', audioDuration, 'seconds');
+            
+            // Hide message after 2.5 seconds, but keep piece visible until audio ends
+            setTimeout(() => {
+                unlockMessage.style.display = 'none';
+                displayPiece(pieceId, false, audio); // Pass audio to control when it floats
+            }, 2500);
+        };
+        
+        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+            onAudioReady();
+        } else {
+            audio.addEventListener('loadedmetadata', onAudioReady, { once: true });
+            // Fallback: if metadata doesn't load, use minimum time
+            setTimeout(() => {
+                if (audio.readyState < 2) {
+                    console.warn('Audio metadata not loaded, using fallback timing');
+                    showPiece();
+                }
+            }, 1000);
+        }
+    } else {
+        // No audio, use default timing
+        setTimeout(() => {
+            unlockMessage.style.display = 'none';
+            displayPiece(pieceId, false);
+        }, 2500);
+    }
 }
 
 // Add blur to background pieces when showing new piece
@@ -762,7 +799,8 @@ function unblurBackgroundPieces() {
 }
 
 // Display a puzzle piece
-function displayPiece(pieceId, skipAnimation = false) {
+// audio: optional audio object - if provided, piece stays visible until audio finishes
+function displayPiece(pieceId, skipAnimation = false, audio = null) {
     console.log('displayPiece called with:', pieceId);
     
     const piece = puzzlePieces[pieceId];
@@ -845,8 +883,8 @@ function displayPiece(pieceId, skipAnimation = false) {
         }, 100);
     }
     
-    // After 5 seconds, make it float
-    setTimeout(() => {
+    // Function to make piece float
+    const makePieceFloat = () => {
         // Remove blur effect
         unblurBackgroundPieces();
         
@@ -909,7 +947,61 @@ function displayPiece(pieceId, skipAnimation = false) {
         if (physicsAnimationId === null) {
             startAnimationLoop();
         }
-    }, skipAnimation ? 0 : CONFIG.pieceDisplayTime);
+    };
+    
+    // If skipAnimation, make it float immediately
+    if (skipAnimation) {
+        makePieceFloat();
+        return;
+    }
+    
+    // If we have audio, wait for it to finish before making piece float
+    if (audio) {
+        const startFloatWhenAudioEnds = () => {
+            const audioDuration = audio.duration || 0;
+            console.log('Waiting for audio to finish. Duration:', audioDuration, 'seconds');
+            
+            // Listen for audio end event
+            const onAudioEnd = () => {
+                console.log('Audio finished, making piece float');
+                makePieceFloat();
+                audio.removeEventListener('ended', onAudioEnd);
+            };
+            
+            audio.addEventListener('ended', onAudioEnd);
+            
+            // Fallback: if audio doesn't end (e.g., error), use duration or default timeout
+            const fallbackTimeout = audioDuration > 0 
+                ? (audioDuration * 1000) + 500 // Add 500ms buffer
+                : CONFIG.pieceDisplayTime;
+            
+            setTimeout(() => {
+                // Check if audio is still playing
+                if (!audio.paused && !audio.ended) {
+                    console.warn('Audio still playing after expected duration, making piece float anyway');
+                    makePieceFloat();
+                    audio.removeEventListener('ended', onAudioEnd);
+                }
+            }, fallbackTimeout);
+        };
+        
+        // Wait for audio metadata to be loaded
+        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+            startFloatWhenAudioEnds();
+        } else {
+            audio.addEventListener('loadedmetadata', startFloatWhenAudioEnds, { once: true });
+            // Fallback if metadata never loads
+            setTimeout(() => {
+                if (audio.readyState < 2) {
+                    console.warn('Audio metadata not loaded, using default timing');
+                    setTimeout(makePieceFloat, CONFIG.pieceDisplayTime);
+                }
+            }, 1000);
+        }
+    } else {
+        // No audio, use default timing
+        setTimeout(makePieceFloat, CONFIG.pieceDisplayTime);
+    }
 }
 
 // Setup touch/mouse interaction for bouncing pieces
