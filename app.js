@@ -27,6 +27,24 @@ let physicsAnimationId = null;
 let currentMessageIndex = 0;
 let touchPosition = { x: -1, y: -1 }; // Track touch/mouse position
 let isTouching = false;
+let audioUnlocked = false; // Track if audio context has been unlocked
+
+// Unlock audio context on first user interaction
+function unlockAudioContext() {
+    if (audioUnlocked) return;
+    
+    // Create a silent audio and play it to unlock the audio context
+    const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+    silentAudio.volume = 0.01;
+    silentAudio.play().then(() => {
+        audioUnlocked = true;
+        console.log('Audio context unlocked');
+        silentAudio.pause();
+        silentAudio.remove();
+    }).catch(err => {
+        console.log('Audio unlock attempt:', err);
+    });
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,6 +53,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadScannedPieces();
     initializePuzzle();
     updateProgress();
+    
+    // Unlock audio on any user interaction
+    const unlockEvents = ['touchstart', 'touchend', 'click', 'mousedown', 'keydown'];
+    const unlockAudioOnce = () => {
+        unlockAudioContext();
+        unlockEvents.forEach(event => {
+            document.removeEventListener(event, unlockAudioOnce);
+        });
+    };
+    unlockEvents.forEach(event => {
+        document.addEventListener(event, unlockAudioOnce, { once: true, passive: true });
+    });
     
     // Check URL after everything is initialized
     // Use a longer delay to ensure all DOM elements are ready
@@ -104,6 +134,9 @@ function checkURLForPiece() {
         
         if (!isNaN(pieceNum) && pieceNum >= 0 && pieceNum < 9) {
             console.log('✅ Valid piece number, unlocking piece:', pieceNum);
+            
+            // Try to unlock audio context immediately when QR code is scanned
+            unlockAudioContext();
             
             // Check if we're in a new tab/window
             const isNewTab = window.opener !== null || 
@@ -415,11 +448,24 @@ function playUnlockAudio(pieceId) {
         return;
     }
     
+    console.log('Playing unlock audio for piece', pieceId, ':', audioPath);
+    
     // Create and play audio
     const audio = new Audio(audioPath);
     
+    // Preload the audio
+    audio.preload = 'auto';
+    
     // Set volume (0.0 to 1.0)
     audio.volume = 0.7;
+    
+    // Load the audio file
+    audio.load();
+    
+    // Add load event listener
+    audio.addEventListener('loadeddata', () => {
+        console.log('Audio loaded successfully:', audioPath);
+    });
     
     // Handle errors gracefully
     audio.onerror = function() {
@@ -449,18 +495,34 @@ function playUnlockAudio(pieceId) {
     };
     
     // Play audio
-    audio.play().catch(err => {
-        console.warn('Could not play audio (may require user interaction):', err);
-        // On mobile, audio might need user interaction first
-        // Try to play on next user interaction
+    const playAudio = () => {
+        audio.play().catch(err => {
+            console.warn('Could not play audio:', err);
+            // If audio context not unlocked, try to unlock it
+            if (!audioUnlocked) {
+                unlockAudioContext();
+                // Try again after a short delay
+                setTimeout(() => {
+                    audio.play().catch(e => console.warn('Audio still failed after unlock:', e));
+                }, 100);
+            }
+        });
+    };
+    
+    // Try to play immediately
+    playAudio();
+    
+    // If that fails, try on next interaction
+    if (!audioUnlocked) {
         const playOnInteraction = () => {
-            audio.play().catch(() => {});
+            unlockAudioContext();
+            setTimeout(() => playAudio(), 100);
             document.removeEventListener('touchstart', playOnInteraction);
             document.removeEventListener('click', playOnInteraction);
         };
         document.addEventListener('touchstart', playOnInteraction, { once: true });
         document.addEventListener('click', playOnInteraction, { once: true });
-    });
+    }
     
     // Store reference to stop if needed
     if (!window.unlockAudios) {
