@@ -1083,8 +1083,8 @@ function showSuccessMessage() {
     const message = document.createElement('div');
     message.className = 'success-message';
     message.innerHTML = `
-        <h2>🎉 Puzzle Complete! 🎉</h2>
-        <p>You've revealed the entire picture!</p>
+        <h2>🎉 Ты собрала все части! 🎉</h2>
+        <p>Ты разблокировала всю картинку!</p>
     `;
     document.body.appendChild(message);
     
