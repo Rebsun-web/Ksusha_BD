@@ -7,9 +7,9 @@ const CONFIG = {
 
 // Motivational messages that rotate when new pieces are unlocked
 const MOTIVATIONAL_MESSAGES = [
-    "Готова к следующему сюрпризу? 📸✨",
-    "Каждый QR — это ещё один кусочек тебя",
-    "Продолжай охоту за воспоминаниями 💛"
+    "Давай глубже!",
+    "Ну ты жаришь!",
+    "Ну ты мастер!"
 ];
 
 // State
@@ -366,7 +366,7 @@ function unlockPiece(pieceId) {
     console.log('Scanned pieces:', scannedPieces.size, 'Total needed:', totalPieces);
     
     if (scannedPieces.size === totalPieces) {
-        console.log('🎉 All pieces collected! Showing complete puzzle...');
+        console.log('🎉 Все части собраны! Вот готовая картинка...');
         setTimeout(() => {
             showCompletePuzzle();
         }, CONFIG.pieceDisplayTime + 2000);
@@ -1035,12 +1035,12 @@ function updateProgress() {
     } else if (foundCount < totalPieces) {
         progressMessage.textContent = `Осталось ${remaining} сюрпризов 💫`;
     } else {
-        progressMessage.textContent = 'Все сюрпризы найдены! 🎉';
+        progressMessage.textContent = 'И Беги покупать беговые кроссовки:)';
     }
     
     // Update title if needed
     if (foundCount === totalPieces) {
-        progressTitle.textContent = '🎁 Подарок готов!';
+        progressTitle.textContent = 'Пакуй трусишки в Порто!';
     }
 }
 
