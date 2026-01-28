@@ -154,17 +154,66 @@ function checkURLForPiece() {
                 const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
                 const isLastPiece = scannedPieces.size >= totalPieces;
                 
-                // If this looks like a new tab from QR scan, redirect to main page after a delay
+                // If this looks like a new tab from QR scan, redirect to main page after audio finishes
                 // This keeps all pieces visible in one tab
                 // BUT: Don't redirect if this is the last piece - let showCompletePuzzle handle it
                 const isLikelyQRScan = window.history.length <= 2 && document.referrer === '';
                 
                 if (isLikelyQRScan && !isLastPiece) {
-                    // Show unlock message, then redirect to main page
-                    setTimeout(() => {
-                        // Redirect to main page (without piece parameter)
-                        window.location.href = window.location.pathname;
-                    }, 3000); // Wait 3 seconds to show the unlock animation
+                    // Wait for audio to finish before redirecting
+                    const checkAudioAndRedirect = () => {
+                        // Check if there's an audio playing (use currentPieceAudio or find in array)
+                        const currentAudio = window.currentPieceAudio || 
+                            (window.unlockAudios && window.unlockAudios.find(a => {
+                                return !a.paused && !a.ended;
+                            }));
+                        
+                        if (currentAudio && !currentAudio.ended) {
+                            console.log('Waiting for audio to finish before redirecting...');
+                            console.log('Audio duration:', currentAudio.duration, 'seconds');
+                            
+                            // Wait for audio to end
+                            const onAudioEnd = () => {
+                                console.log('✅ Audio finished, now redirecting to main page');
+                                // Small delay to ensure everything is processed
+                                setTimeout(() => {
+                                    window.location.href = window.location.pathname;
+                                }, 200);
+                            };
+                            currentAudio.addEventListener('ended', onAudioEnd, { once: true });
+                            
+                            // Fallback: if audio doesn't end, use duration + buffer
+                            const audioDuration = currentAudio.duration || 0;
+                            if (audioDuration > 0 && !isNaN(audioDuration) && isFinite(audioDuration)) {
+                                const fallbackTime = (audioDuration * 1000) + 2000; // Add 2 second buffer
+                                console.log('Setting fallback redirect timeout:', fallbackTime, 'ms');
+                                setTimeout(() => {
+                                    if (!currentAudio.ended) {
+                                        console.warn('⚠️ Audio did not end, redirecting anyway after', fallbackTime, 'ms');
+                                        window.location.href = window.location.pathname;
+                                    }
+                                }, fallbackTime);
+                            } else {
+                                // If we can't get duration, wait a reasonable time
+                                console.log('Audio duration not available, using 10 second fallback');
+                                setTimeout(() => {
+                                    if (!currentAudio.ended) {
+                                        console.warn('⚠️ Redirecting after 10 second timeout');
+                                        window.location.href = window.location.pathname;
+                                    }
+                                }, 10000); // 10 seconds max wait
+                            }
+                        } else {
+                            // No audio playing, redirect after a short delay
+                            console.log('No audio playing, redirecting after short delay');
+                            setTimeout(() => {
+                                window.location.href = window.location.pathname;
+                            }, 3000);
+                        }
+                    };
+                    
+                    // Wait a bit for audio to start and unlock message to appear
+                    setTimeout(checkAudioAndRedirect, 1000);
                 } else if (!isLastPiece) {
                     // Normal navigation - just clean URL
                     setTimeout(() => {
@@ -558,11 +607,14 @@ function playUnlockAudio(pieceId) {
         console.error('❌ Audio error for piece', pieceId, ':', e);
     });
     
-    // Store reference to stop if needed
+    // Store reference globally so redirect logic can access it
     if (!window.unlockAudios) {
         window.unlockAudios = [];
     }
     window.unlockAudios.push(audio);
+    
+    // Also store the current piece's audio for easy access
+    window.currentPieceAudio = audio;
     
     // Clean up after audio finishes
     audio.addEventListener('ended', () => {
@@ -570,6 +622,10 @@ function playUnlockAudio(pieceId) {
         const index = window.unlockAudios.indexOf(audio);
         if (index > -1) {
             window.unlockAudios.splice(index, 1);
+        }
+        // Clear current piece audio reference
+        if (window.currentPieceAudio === audio) {
+            window.currentPieceAudio = null;
         }
     });
     
