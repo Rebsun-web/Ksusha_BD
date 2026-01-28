@@ -495,35 +495,43 @@ function playUnlockAudio(pieceId) {
         }
     };
     
-    // Play audio
-    const playAudio = () => {
-        audio.play().catch(err => {
-            console.warn('Could not play audio:', err);
+    // Play audio with retry logic
+    const playAudio = (retryCount = 0) => {
+        const maxRetries = 5;
+        audio.play().then(() => {
+            console.log('Audio playing successfully');
+        }).catch(err => {
+            console.warn('Could not play audio (attempt', retryCount + 1, '):', err);
+            
             // If audio context not unlocked, try to unlock it
             if (!audioUnlocked) {
                 unlockAudioContext();
-                // Try again after a short delay
+            }
+            
+            // Retry with exponential backoff
+            if (retryCount < maxRetries) {
+                const delay = Math.min(100 * Math.pow(2, retryCount), 1000);
                 setTimeout(() => {
-                    audio.play().catch(e => console.warn('Audio still failed after unlock:', e));
-                }, 100);
+                    playAudio(retryCount + 1);
+                }, delay);
+            } else {
+                // After max retries, wait for user interaction
+                const playOnInteraction = () => {
+                    unlockAudioContext();
+                    setTimeout(() => {
+                        audio.play().catch(e => console.warn('Audio failed after interaction:', e));
+                    }, 100);
+                    document.removeEventListener('touchstart', playOnInteraction);
+                    document.removeEventListener('click', playOnInteraction);
+                };
+                document.addEventListener('touchstart', playOnInteraction, { once: true });
+                document.addEventListener('click', playOnInteraction, { once: true });
             }
         });
     };
     
     // Try to play immediately
     playAudio();
-    
-    // If that fails, try on next interaction
-    if (!audioUnlocked) {
-        const playOnInteraction = () => {
-            unlockAudioContext();
-            setTimeout(() => playAudio(), 100);
-            document.removeEventListener('touchstart', playOnInteraction);
-            document.removeEventListener('click', playOnInteraction);
-        };
-        document.addEventListener('touchstart', playOnInteraction, { once: true });
-        document.addEventListener('click', playOnInteraction, { once: true });
-    }
     
     // Store reference to stop if needed
     if (!window.unlockAudios) {
@@ -539,15 +547,8 @@ function playUnlockAudio(pieceId) {
         }
     });
     
-    // Stop audio after the full unlock period (message display + piece display)
-    // Message shows for 2.5s, then piece shows for pieceDisplayTime (5s)
-    const totalUnlockTime = 2500 + CONFIG.pieceDisplayTime; // ~7.5 seconds total
-    setTimeout(() => {
-        if (!audio.paused) {
-            audio.pause();
-            audio.currentTime = 0;
-        }
-    }, totalUnlockTime);
+    // Let audio play to completion - don't stop it early
+    // Audio will naturally stop when it finishes playing
 }
 
 // Show unlock message with the piece
@@ -614,7 +615,22 @@ function showUnlockMessage(pieceId) {
     // Enhanced confetti with more particles
     triggerConfetti();
     
-    // Play unlock audio
+    // Make the unlock message clickable to unlock audio if needed
+    // This helps when scanning QR codes (which don't count as user interaction)
+    unlockMessage.style.cursor = 'pointer';
+    const unlockAudioOnMessageClick = () => {
+        unlockAudioContext();
+        unlockMessage.removeEventListener('click', unlockAudioOnMessageClick);
+        unlockMessage.removeEventListener('touchstart', unlockAudioOnMessageClick);
+    };
+    unlockMessage.addEventListener('click', unlockAudioOnMessageClick, { once: true });
+    unlockMessage.addEventListener('touchstart', unlockAudioOnMessageClick, { once: true });
+    
+    // Try to unlock audio immediately when message is shown
+    // This helps with QR code scans
+    unlockAudioContext();
+    
+    // Play unlock audio (will retry if audio context not unlocked yet)
     playUnlockAudio(pieceId);
     
     // Ensure image becomes visible after a short delay
