@@ -2,7 +2,14 @@
 const CONFIG = {
     gridSize: 3, // 3x3 grid = 9 pieces
     pieceDisplayTime: 5000, // 5 seconds before floating
-    mainImagePath: 'puzzle-image.png' // Path to your main image
+    mainImagePath: 'puzzle-image.png', // Path to your main image
+    // Audio configuration - set to null to disable, or provide paths
+    // Option 1: One audio file per piece (audio/piece-0.mp3, audio/piece-1.mp3, etc.)
+    audioPerPiece: true,
+    audioBasePath: 'audio/',
+    audioExtension: 'mp3', // or 'wav', 'ogg', etc.
+    // Option 2: Single audio file for all pieces (set audioPerPiece to false)
+    // singleAudioPath: 'audio/unlock.mp3'
 };
 
 // Motivational messages that rotate when new pieces are unlocked
@@ -389,6 +396,97 @@ function updateInstructionMessage() {
     }
 }
 
+// Play audio when a piece is unlocked
+function playUnlockAudio(pieceId) {
+    // Check if audio is disabled
+    if (!CONFIG.audioPerPiece && !CONFIG.singleAudioPath) {
+        return;
+    }
+    
+    let audioPath;
+    
+    if (CONFIG.audioPerPiece) {
+        // Use per-piece audio files
+        audioPath = `${CONFIG.audioBasePath}piece-${pieceId}.${CONFIG.audioExtension}`;
+    } else if (CONFIG.singleAudioPath) {
+        // Use single audio file for all pieces
+        audioPath = CONFIG.singleAudioPath;
+    } else {
+        return;
+    }
+    
+    // Create and play audio
+    const audio = new Audio(audioPath);
+    
+    // Set volume (0.0 to 1.0)
+    audio.volume = 0.7;
+    
+    // Handle errors gracefully
+    audio.onerror = function() {
+        console.warn('Failed to load audio:', audioPath);
+        // Try alternative paths if per-piece audio
+        if (CONFIG.audioPerPiece) {
+            const altPaths = [
+                `./${audioPath}`,
+                `/${audioPath}`,
+                `${CONFIG.audioBasePath}piece-${pieceId}.wav`,
+                `${CONFIG.audioBasePath}piece-${pieceId}.ogg`
+            ];
+            let currentPathIndex = 0;
+            const tryNextPath = () => {
+                if (currentPathIndex < altPaths.length) {
+                    audio.src = altPaths[currentPathIndex];
+                    currentPathIndex++;
+                    audio.load();
+                    audio.play().catch(err => {
+                        console.warn('Failed to play audio from:', altPaths[currentPathIndex - 1]);
+                        tryNextPath();
+                    });
+                }
+            };
+            tryNextPath();
+        }
+    };
+    
+    // Play audio
+    audio.play().catch(err => {
+        console.warn('Could not play audio (may require user interaction):', err);
+        // On mobile, audio might need user interaction first
+        // Try to play on next user interaction
+        const playOnInteraction = () => {
+            audio.play().catch(() => {});
+            document.removeEventListener('touchstart', playOnInteraction);
+            document.removeEventListener('click', playOnInteraction);
+        };
+        document.addEventListener('touchstart', playOnInteraction, { once: true });
+        document.addEventListener('click', playOnInteraction, { once: true });
+    });
+    
+    // Store reference to stop if needed
+    if (!window.unlockAudios) {
+        window.unlockAudios = [];
+    }
+    window.unlockAudios.push(audio);
+    
+    // Clean up after audio finishes (or after 5 seconds max)
+    audio.addEventListener('ended', () => {
+        const index = window.unlockAudios.indexOf(audio);
+        if (index > -1) {
+            window.unlockAudios.splice(index, 1);
+        }
+    });
+    
+    // Stop audio after the full unlock period (message display + piece display)
+    // Message shows for 2.5s, then piece shows for pieceDisplayTime (5s)
+    const totalUnlockTime = 2500 + CONFIG.pieceDisplayTime; // ~7.5 seconds total
+    setTimeout(() => {
+        if (!audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+    }, totalUnlockTime);
+}
+
 // Show unlock message with the piece
 function showUnlockMessage(pieceId) {
     const unlockMessage = document.getElementById('unlock-message');
@@ -452,6 +550,9 @@ function showUnlockMessage(pieceId) {
     
     // Enhanced confetti with more particles
     triggerConfetti();
+    
+    // Play unlock audio
+    playUnlockAudio(pieceId);
     
     // Ensure image becomes visible after a short delay
     setTimeout(() => {
