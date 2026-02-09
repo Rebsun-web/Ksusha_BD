@@ -30,6 +30,7 @@ let currentMessageIndex = 0;
 let touchPosition = { x: -1, y: -1 }; // Track touch/mouse position
 let isTouching = false;
 let audioUnlocked = false; // Track if audio context has been unlocked
+let pieceAudioMap = {}; // Store audio references by piece ID for replay
 
 // Unlock audio context on first user interaction
 function unlockAudioContext() {
@@ -616,6 +617,12 @@ function playUnlockAudio(pieceId) {
     // Also store the current piece's audio for easy access
     window.currentPieceAudio = audio;
     
+    // Store audio reference by piece ID for replay functionality
+    pieceAudioMap[pieceId] = {
+        audio: audio,
+        audioPath: audioPath
+    };
+    
     // Clean up after audio finishes
     audio.addEventListener('ended', () => {
         console.log('Audio finished playing for piece', pieceId);
@@ -631,6 +638,80 @@ function playUnlockAudio(pieceId) {
     
     // Return audio object so caller can track duration
     return audio;
+}
+
+// Replay audio for a specific piece
+function replayPieceAudio(pieceId) {
+    console.log('🔊 Replaying audio for piece', pieceId);
+    
+    // Unlock audio context first
+    unlockAudioContext();
+    
+    // Check if we have a stored audio reference
+    const storedAudio = pieceAudioMap[pieceId];
+    
+    if (storedAudio && storedAudio.audio) {
+        const audio = storedAudio.audio;
+        
+        // Check if audio element is still valid
+        try {
+            // If audio is already playing, restart it from beginning
+            if (!audio.paused && !audio.ended) {
+                audio.currentTime = 0;
+                console.log('Restarting already playing audio');
+            } else {
+                // Reset to beginning and play
+                audio.currentTime = 0;
+                audio.play().then(() => {
+                    console.log('✅ Audio replay started successfully');
+                }).catch(err => {
+                    console.warn('Could not replay stored audio, creating new instance:', err);
+                    // If replay fails, create a new audio instance
+                    createNewAudioForReplay(pieceId, storedAudio.audioPath);
+                });
+            }
+        } catch (error) {
+            console.warn('Error accessing stored audio, creating new instance:', error);
+            // Audio element might be invalid, create new one
+            createNewAudioForReplay(pieceId, storedAudio.audioPath);
+        }
+    } else {
+        // No stored audio, create new one
+        console.log('No stored audio found, creating new audio for piece', pieceId);
+        playUnlockAudio(pieceId);
+    }
+}
+
+// Helper function to create a new audio instance for replay
+function createNewAudioForReplay(pieceId, audioPath) {
+    if (!audioPath) {
+        // Fallback: use playUnlockAudio to get the path
+        playUnlockAudio(pieceId);
+        return;
+    }
+    
+    console.log('Creating new audio instance for replay:', audioPath);
+    const audio = new Audio(audioPath);
+    audio.volume = 1;
+    audio.preload = 'auto';
+    
+    // Store the new audio reference
+    pieceAudioMap[pieceId] = {
+        audio: audio,
+        audioPath: audioPath
+    };
+    
+    // Play the audio
+    audio.play().then(() => {
+        console.log('✅ New audio instance playing');
+    }).catch(err => {
+        console.warn('Could not play new audio instance:', err);
+    });
+    
+    // Add event listeners
+    audio.addEventListener('ended', () => {
+        console.log('Replayed audio finished for piece', pieceId);
+    });
 }
 
 // Play final song when puzzle is complete
@@ -1028,9 +1109,12 @@ function displayPiece(pieceId, skipAnimation = false, audio = null) {
         
         floatingPieces.push(pieceData);
         
-        // Add click handler to open piece in viewer
+        // Add click handler to open piece in viewer and replay audio
         pieceElement.addEventListener('click', (e) => {
             e.stopPropagation();
+            // Replay audio when piece is clicked
+            replayPieceAudio(pieceId);
+            // Also open viewer
             openPieceViewer(pieceId);
         });
         
@@ -1212,9 +1296,22 @@ function openPieceViewer(pieceId) {
     imageContainer.innerHTML = '';
     imageContainer.appendChild(img);
     
+    // Make the image clickable to replay audio
+    img.style.cursor = 'pointer';
+    img.addEventListener('click', (e) => {
+        e.stopPropagation();
+        replayPieceAudio(pieceId);
+    });
+    
+    // Add a visual indicator that audio can be replayed
+    img.title = 'Tap to replay audio';
+    
     // Show viewer
     viewer.style.display = 'flex';
     document.body.style.overflow = 'hidden'; // Prevent scrolling
+    
+    // Auto-replay audio when viewer opens
+    replayPieceAudio(pieceId);
 }
 
 // Close piece viewer modal
