@@ -152,8 +152,9 @@ function checkURLForPiece() {
             // Check if this is the last piece AFTER unlocking
             // Use a small delay to ensure scannedPieces is updated
             setTimeout(() => {
-                const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
-                const isLastPiece = scannedPieces.size >= totalPieces;
+                // Check if all 6 required pieces (0-5) are collected
+                const requiredPieces = [0, 1, 2, 3, 4, 5];
+                const isLastPiece = requiredPieces.every(pieceId => scannedPieces.has(pieceId.toString()));
                 
                 // If this looks like a new tab from QR scan, redirect to main page after audio finishes
                 // This keeps all pieces visible in one tab
@@ -454,11 +455,15 @@ function unlockPiece(pieceId) {
     // Show unlock message and piece
     showUnlockMessage(pieceId);
     
-    // Check if puzzle is complete
-    const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
-    console.log('Scanned pieces:', scannedPieces.size, 'Total needed:', totalPieces);
+    // Check if puzzle is complete (only first 6 pieces: 0-5)
+    const requiredPieces = [0, 1, 2, 3, 4, 5];
+    const hasAllRequiredPieces = requiredPieces.every(pieceId => scannedPieces.has(pieceId.toString()));
     
-    if (scannedPieces.size === totalPieces) {
+    console.log('Scanned pieces:', scannedPieces.size);
+    console.log('Required pieces for completion:', requiredPieces);
+    console.log('Has all required pieces:', hasAllRequiredPieces);
+    
+    if (hasAllRequiredPieces) {
         console.log('🎉 Все части собраны! Вот готовая картинка...');
         setTimeout(() => {
             showCompletePuzzle();
@@ -1397,6 +1402,19 @@ function triggerConfetti() {
     draw();
 }
 
+// Custom grid layout for the first 6 pieces
+// Format: pieceId -> [row, col]
+// Layout: [0, 3, 4]
+//         [1, 2, 5]
+const COMPLETE_PUZZLE_LAYOUT = {
+    0: [0, 0], // Top-left
+    3: [0, 1], // Top-center
+    4: [0, 2], // Top-right
+    1: [1, 0], // Bottom-left
+    2: [1, 1], // Bottom-center
+    5: [1, 2]  // Bottom-right
+};
+
 // Show complete puzzle
 function showCompletePuzzle() {
     console.log('showCompletePuzzle called');
@@ -1414,24 +1432,42 @@ function showCompletePuzzle() {
         physicsAnimationId = null;
     }
     
+    // Filter to only include pieces 0-5
+    const piecesToShow = floatingPieces.filter(p => p.id >= 0 && p.id <= 5);
+    console.log('Pieces to show in complete puzzle:', piecesToShow.map(p => p.id));
+    
     // Calculate center position and piece size for the final puzzle
+    // Layout is 2 rows x 3 columns
+    const layoutRows = 2;
+    const layoutCols = 3;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const puzzleSize = Math.min(viewportWidth * 0.85, viewportHeight * 0.7);
-    const pieceSize = puzzleSize / CONFIG.gridSize;
+    const pieceSize = puzzleSize / layoutCols; // Use 3 columns for sizing
     const centerX = viewportWidth / 2;
     const centerY = viewportHeight / 2;
     
     console.log('Animating pieces to form puzzle. Puzzle size:', puzzleSize, 'Piece size:', pieceSize);
+    console.log('Layout: 2 rows x 3 columns');
     
     // Animate floating pieces to their correct positions in the puzzle
-    floatingPieces.forEach(p => {
+    piecesToShow.forEach(p => {
         if (p.element) {
-            // Calculate target position for this piece in the grid
-            // For 3x3 grid: col 0,1,2 -> offset -1,0,1
-            const offsetX = (p.col - (CONFIG.gridSize - 1) / 2) * pieceSize;
+            // Get custom grid position for this piece
+            const layout = COMPLETE_PUZZLE_LAYOUT[p.id];
+            if (!layout) {
+                console.warn(`No layout defined for piece ${p.id}, skipping`);
+                return;
+            }
+            
+            const [targetRow, targetCol] = layout;
+            
+            // Calculate target position based on custom 2x3 layout
+            // Center the 3-column grid horizontally
+            const offsetX = (targetCol - (layoutCols - 1) / 2) * pieceSize;
             const targetX = centerX + offsetX;
-            const offsetY = (p.row - (CONFIG.gridSize - 1) / 2) * pieceSize;
+            // Center the 2-row grid vertically
+            const offsetY = (targetRow - (layoutRows - 1) / 2) * pieceSize;
             const targetY = centerY + offsetY;
             
             // Get current position relative to viewport
@@ -1439,7 +1475,7 @@ function showCompletePuzzle() {
             const currentX = currentRect.left + currentRect.width / 2;
             const currentY = currentRect.top + currentRect.height / 2;
             
-            console.log(`Piece ${p.id} (row ${p.row}, col ${p.col}): moving from (${currentX}, ${currentY}) to (${targetX}, ${targetY})`);
+            console.log(`Piece ${p.id} (custom layout row ${targetRow}, col ${targetCol}): moving from (${currentX}, ${currentY}) to (${targetX}, ${targetY})`);
             
             // Remove floating class and set up for animation
             p.element.classList.remove('floating');
@@ -1523,8 +1559,8 @@ function showCompletePuzzle() {
             // Force a reflow to ensure display
             container.offsetHeight;
             
-            // Fade out the individual pieces
-            floatingPieces.forEach(p => {
+            // Fade out the individual pieces (only pieces 0-5)
+            piecesToShow.forEach(p => {
                 if (p.element) {
                     p.element.style.transition = 'opacity 1.5s ease-out';
                     p.element.style.opacity = '0';
@@ -1559,8 +1595,10 @@ function showSuccessMessage() {
 
 // Update progress display with emotional journey
 function updateProgress() {
-    const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
-    const foundCount = scannedPieces.size;
+    // Only count pieces 0-5 for completion
+    const requiredPieces = [0, 1, 2, 3, 4, 5];
+    const totalPieces = requiredPieces.length; // 6 pieces
+    const foundCount = requiredPieces.filter(pieceId => scannedPieces.has(pieceId.toString())).length;
     const remaining = totalPieces - foundCount;
     
     const progressBar = document.getElementById('progress-bar');
@@ -1588,7 +1626,7 @@ function updateProgress() {
     
     // Update emotional messages
     if (foundCount === 0) {
-        progressMessage.textContent = 'Осталось 9 сюрпризов 💫';
+        progressMessage.textContent = 'Осталось 6 сюрпризов 💫';
     } else if (foundCount < totalPieces / 2) {
         progressMessage.textContent = `Осталось ${remaining} сюрпризов 💫`;
     } else if (foundCount === Math.floor(totalPieces / 2)) {
