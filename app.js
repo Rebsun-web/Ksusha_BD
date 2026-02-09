@@ -1503,9 +1503,6 @@ function showCompletePuzzle() {
     setTimeout(() => {
         console.log('Pieces should be in position now');
         
-        // Show success message first
-        showSuccessMessage();
-        
         // Wait a bit more, then fade pieces and show complete image
         setTimeout(() => {
             console.log('Showing complete puzzle container');
@@ -1576,6 +1573,11 @@ function showCompletePuzzle() {
             }, 1500);
         }, 2000); // Wait 2 seconds after pieces are in position
     }, 2500); // Wait for pieces to animate into position (2.5s animation + buffer)
+    
+    // Show success message 10 seconds after showCompletePuzzle is called
+    setTimeout(() => {
+        showSuccessMessage();
+    }, 10000);
 }
 
 // Show success message
