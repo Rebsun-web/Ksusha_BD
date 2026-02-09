@@ -152,9 +152,9 @@ function checkURLForPiece() {
             // Check if this is the last piece AFTER unlocking
             // Use a small delay to ensure scannedPieces is updated
             setTimeout(() => {
-                // Check if all 9 pieces are collected
-                const totalPieces = CONFIG.gridSize * CONFIG.gridSize;
-                const isLastPiece = scannedPieces.size >= totalPieces;
+                // Check if all 8 required pieces (0-7) are collected
+                const requiredPieces = [0, 1, 2, 3, 4, 5, 6, 7];
+                const isLastPiece = requiredPieces.every(pieceId => scannedPieces.has(pieceId.toString()));
                 
                 // If this looks like a new tab from QR scan, redirect to main page after audio finishes
                 // This keeps all pieces visible in one tab
@@ -455,14 +455,16 @@ function unlockPiece(pieceId) {
     // Show unlock message and piece
     showUnlockMessage(pieceId);
     
-    // Check if puzzle is complete (all 9 pieces must be scanned)
-    const totalPieces = CONFIG.gridSize * CONFIG.gridSize; // 9 pieces total
-    const allPiecesScanned = scannedPieces.size === totalPieces;
+    // Check if puzzle is complete (pieces 0-7, 8 pieces total)
+    const requiredPieces = [0, 1, 2, 3, 4, 5, 6, 7];
+    const hasAllRequiredPieces = requiredPieces.every(pieceId => scannedPieces.has(pieceId.toString()));
     
-    console.log('Scanned pieces:', scannedPieces.size, 'Total needed:', totalPieces);
+    console.log('Scanned pieces:', scannedPieces.size);
+    console.log('Required pieces for completion:', requiredPieces);
+    console.log('Has all required pieces:', hasAllRequiredPieces);
     
-    if (allPiecesScanned) {
-        console.log('🎉 Все 9 картинок собраны! Формируем полную картинку из первых 6...');
+    if (hasAllRequiredPieces) {
+        console.log('🎉 Все 8 картинок собраны! Формируем полную картинку из первых 6...');
         setTimeout(() => {
             showCompletePuzzle();
         }, CONFIG.pieceDisplayTime + 2000);
@@ -1593,9 +1595,10 @@ function showSuccessMessage() {
 
 // Update progress display with emotional journey
 function updateProgress() {
-    // Count all 9 pieces for progress display
-    const totalPieces = CONFIG.gridSize * CONFIG.gridSize; // 9 pieces
-    const foundCount = scannedPieces.size;
+    // Count pieces 0-7 for progress (8 pieces total)
+    const requiredPieces = [0, 1, 2, 3, 4, 5, 6, 7];
+    const totalPieces = requiredPieces.length; // 8 pieces
+    const foundCount = requiredPieces.filter(pieceId => scannedPieces.has(pieceId.toString())).length;
     const remaining = totalPieces - foundCount;
     
     const progressBar = document.getElementById('progress-bar');
@@ -1623,7 +1626,7 @@ function updateProgress() {
     
     // Update emotional messages
     if (foundCount === 0) {
-        progressMessage.textContent = 'Осталось 9 сюрпризов 💫';
+        progressMessage.textContent = 'Осталось 8 сюрпризов 💫';
     } else if (foundCount < totalPieces / 2) {
         progressMessage.textContent = `Осталось ${remaining} сюрпризов 💫`;
     } else if (foundCount === Math.floor(totalPieces / 2)) {
